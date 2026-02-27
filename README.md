@@ -1,6 +1,8 @@
-# Local Authentication System
+# LocalAuth
 
-最小化的 NestJS 本地認證系統，使用 PostgreSQL + JWT + Prisma。
+最小化的 NestJS 自架認證系統，使用 PostgreSQL + JWT + Prisma。
+
+**GitHub**: [frankweng-reas/localauth](https://github.com/frankweng-reas/localauth) | `git@github.com:frankweng-reas/localauth.git`
 
 ## 技術棧
 
