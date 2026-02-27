@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth 功能測試</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #eee;
+        }
+        .container { max-width: 1100px; margin: 0 auto; }
+        h1 { margin-bottom: 8px; font-size: 24px; }
+        .subtitle { color: #888; font-size: 14px; margin-bottom: 20px; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+        .card {
+            background: rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .card h2 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 12px; color: #aaa; margin-bottom: 4px; }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+        }
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        .btn-primary { background: #4f46e5; color: white; }
+        .btn-primary:hover { background: #4338ca; }
+        .btn-success { background: #059669; color: white; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-secondary { background: #475569; color: white; }
+        .result {
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 16px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 12px;
+        }
+        .result.success { border-left: 4px solid #22c55e; }
+        .result.error { border-left: 4px solid #ef4444; }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: #1e293b;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header.success { background: rgba(34,197,94,0.2); }
+        .modal-header.error { background: rgba(239,68,68,0.2); }
+        .modal-title { font-size: 16px; font-weight: 600; }
+        .modal-close {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0 4px;
+            line-height: 1;
+        }
+        .modal-close:hover { color: #fff; }
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 60vh;
+        }
+        .modal-body pre {
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Auth 功能測試</h1>
+        <p class="subtitle">模擬註冊、登入、換密碼等完整流程 | <a href="/admin" style="color:#60a5fa">← 用戶管理</a> | API: <code id="apiUrl" style="font-size:12px;color:#94a3b8"></code> | 從其他頁面開啟時可加 <code>?api=http://localhost:4000</code></p>
+
+        <div style="margin-bottom:12px">
+            <button type="button" class="btn-secondary" onclick="testConnection()">測試 API 連線</button>
+            <button type="button" class="btn-secondary" onclick="saveTokens(null,null); showResult({message:'已清除登入狀態'}); showModal({message:'已清除'})">清除登入狀態</button>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h2>1️⃣ 註冊</h2>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="regEmail" placeholder="test@example.com">
+                </div>
+                <div class="form-group">
+                    <label>密碼</label>
+                    <input type="password" id="regPassword" placeholder="至少 6 字元">
+                </div>
+                <div class="form-group">
+                    <label>名稱</label>
+                    <input type="text" id="regName" placeholder="選填">
+                </div>
+                <button type="button" class="btn-primary" id="btnRegister" onclick="doRegister()">註冊</button>
+            </div>
+
+            <div class="card">
+                <h2>2️⃣ 登入</h2>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="loginEmail" placeholder="test@example.com">
+                </div>
+                <div class="form-group">
+                    <label>密碼</label>
+                    <input type="password" id="loginPassword" placeholder="密碼">
+                </div>
+                <button type="button" class="btn-primary" onclick="doLogin()">登入</button>
+            </div>
+
+            <div class="card">
+                <h2>3️⃣ 取得個人資料</h2>
+                <button type="button" class="btn-secondary" id="btnProfile" onclick="doGetProfile()">GET /auth/profile</button>
+            </div>
+
+            <div class="card">
+                <h2>4️⃣ 刷新 Token</h2>
+                <button type="button" class="btn-secondary" onclick="doRefresh()">POST /auth/refresh</button>
+            </div>
+
+            <div class="card">
+                <h2>5️⃣ 修改密碼</h2>
+                <div class="form-group">
+                    <label>舊密碼</label>
+                    <input type="password" id="oldPassword" placeholder="目前密碼">
+                </div>
+                <div class="form-group">
+                    <label>新密碼</label>
+                    <input type="password" id="newPassword" placeholder="新密碼">
+                </div>
+                <button type="button" class="btn-primary" onclick="doChangePassword()">修改密碼</button>
+            </div>
+
+            <div class="card">
+                <h2>6️⃣ 更新名稱</h2>
+                <div class="form-group">
+                    <label>新名稱</label>
+                    <input type="text" id="newName" placeholder="顯示名稱">
+                </div>
+                <button type="button" class="btn-primary" onclick="doUpdateProfile()">PATCH /users/me</button>
+            </div>
+
+            <div class="card">
+                <h2>7️⃣ 驗證 Email</h2>
+                <div class="form-group">
+                    <label>Token（從註冊郵件或 console 取得）</label>
+                    <input type="text" id="verifyToken" placeholder="verification token">
+                </div>
+                <button type="button" class="btn-secondary" onclick="doVerifyEmail()">驗證</button>
+            </div>
+
+            <div class="card">
+                <h2>8️⃣ 重發驗證信</h2>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="resendEmail" placeholder="user@example.com">
+                </div>
+                <button type="button" class="btn-secondary" onclick="doResendVerification()">重發</button>
+            </div>
+
+            <div class="card">
+                <h2>9️⃣ 登出</h2>
+                <button type="button" class="btn-secondary" onclick="doLogout()">POST /auth/logout</button>
+            </div>
+
+            <div class="card">
+                <h2>🔟 刪除帳號</h2>
+                <button type="button" class="btn-danger" onclick="doDeleteAccount()">DELETE /users/me</button>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 20px;">
+            <h2>📋 結果</h2>
+            <pre id="result" class="result">點擊上方按鈕測試，結果會顯示在這裡</pre>
+        </div>
+    </div>
+
+    <div id="modalOverlay" class="modal-overlay" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header" id="modalHeader">
+                <span class="modal-title" id="modalTitle">訊息</span>
+                <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="modalContent"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 支援 ?api=http://localhost:4000 指定 API（Docker 用 port 4000）
+        const API = (() => {
+            const params = new URLSearchParams(window.location.search);
+            const apiParam = params.get('api');
+            if (apiParam) return apiParam.replace(/\/$/, '');
+            return window.location.origin;
+        })();
+        window.addEventListener('unhandledrejection', e => {
+            console.error('Unhandled:', e.reason);
+            const msg = String(e.reason?.message || e.reason);
+            showResult({ error: msg }, true);
+            showModal({ error: msg }, true);
+        });
+        let accessToken = localStorage.getItem('auth_test_token');
+        let refreshToken = localStorage.getItem('auth_test_refresh');
+
+        function saveTokens(access, refresh) {
+            accessToken = access;
+            refreshToken = refresh;
+            if (access) localStorage.setItem('auth_test_token', access);
+            else localStorage.removeItem('auth_test_token');
+            if (refresh) localStorage.setItem('auth_test_refresh', refresh);
+            else localStorage.removeItem('auth_test_refresh');
+        }
+
+        function showResult(data, isError = false) {
+            const el = document.getElementById('result');
+            el.className = 'result ' + (isError ? 'error' : 'success');
+            el.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        }
+
+        function showModal(data, isError = false) {
+            const overlay = document.getElementById('modalOverlay');
+            const header = document.getElementById('modalHeader');
+            const content = document.getElementById('modalContent');
+            const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+            header.className = 'modal-header ' + (isError ? 'error' : 'success');
+            header.querySelector('.modal-title').textContent = isError ? '❌ 錯誤' : '✅ 成功';
+            content.textContent = text;
+            overlay.classList.add('show');
+        }
+
+        function closeModal(e) {
+            if (e && e.target !== e.currentTarget) return;
+            document.getElementById('modalOverlay').classList.remove('show');
+        }
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        function parseErrorMessage(data, fallback) {
+            if (!data) return fallback || '請求失敗';
+            const msg = data.message;
+            if (Array.isArray(msg)) return msg.join('；');
+            if (typeof msg === 'string') return msg;
+            return data.error || fallback || '請求失敗';
+        }
+
+        async function api(method, path, body, needAuth = false) {
+            const opts = { method };
+            opts.headers = { 'Content-Type': 'application/json' };
+            if (needAuth && accessToken) opts.headers['Authorization'] = `Bearer ${accessToken}`;
+            if (body && method !== 'GET') opts.body = JSON.stringify(body);
+            const res = await fetch(API + path, opts);
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(parseErrorMessage(data, res.statusText));
+            }
+            return data;
+        }
+
+        async function doRegister() {
+            const btn = document.getElementById('btnRegister');
+            const email = document.getElementById('regEmail').value.trim();
+            const password = document.getElementById('regPassword').value;
+            const name = document.getElementById('regName').value.trim();
+            if (!email) { showModal({ error: '請輸入 Email' }, true); return; }
+            if (!password || password.length < 6) { showModal({ error: '密碼至少 6 個字元' }, true); return; }
+            btn.disabled = true;
+            btn.textContent = '處理中...';
+            try {
+                const data = await api('POST', '/auth/register', {
+                    email, password, name: name || undefined
+                });
+                document.getElementById('loginEmail').value = email;
+                document.getElementById('loginPassword').value = password;
+                showResult(data);
+                showModal(data);
+            } catch (e) {
+                showResult({ error: e.message }, true);
+                showModal({ error: e.message }, true);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '註冊';
+            }
+        }
+
+        async function doLogin() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            if (!email) { showModal({ error: '請輸入 Email' }, true); return; }
+            if (!password) { showModal({ error: '請輸入密碼' }, true); return; }
+            try {
+                const data = await api('POST', '/auth/login', { email, password });
+                if (!data.access_token || !data.refresh_token) {
+                    throw new Error('API 回傳格式錯誤，缺少 token');
+                }
+                saveTokens(data.access_token, data.refresh_token);
+                showResult(data);
+                showModal(data);
+            } catch (e) {
+                showResult({ error: e.message }, true);
+                showModal({ error: e.message }, true);
+            }
+        }
+
+        async function doGetProfile() {
+            if (!accessToken) { showModal({ error: '請先登入' }, true); return; }
+            const btn = document.getElementById('btnProfile');
+            btn.disabled = true;
+            btn.textContent = '取得中...';
+            try {
+                const data = await api('GET', '/auth/profile', null, true);
+                showResult(data);
+                showModal(data);
+            } catch (e) {
+                showResult({ error: e.message }, true);
+                showModal({ error: e.message }, true);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'GET /auth/profile';
+            }
+        }
+
+        async function doRefresh() {
+            if (!refreshToken) { showModal({ error: '請先登入' }, true); return; }
+            try {
+                const data = await api('POST', '/auth/refresh', { refresh_token: refreshToken });
+                if (!data.access_token || !data.refresh_token) {
+                    throw new Error('API 回傳格式錯誤');
+                }
+                saveTokens(data.access_token, data.refresh_token);
+                showResult(data);
+                showModal(data);
+            } catch (e) {
+                showResult({ error: e.message }, true);
+                showModal({ error: e.message }, true);
+            }
+        }
+
+        async function doChangePassword() {
+            const oldPwd = document.getElementById('oldPassword').value;
+            const newPwd = document.getElementById('newPassword').value;
+            if (!oldPwd) { showModal({ error: '請輸入舊密碼' }, true); return; }
+            if (!newPwd || newPwd.length < 6) { showModal({ error: '新密碼至少 6 個字元' }, true); return; }
+            if (!accessToken) { showModal({ error: '請先登入' }, true); return; }
+            try {
+                const data = await api('PATCH', '/auth/password', {
+                    old_password: oldPwd,
+                    new_password: newPwd
+                }, true);
+                showResult(data);
+                showModal(data);
+            } catch (e) {
+                showResult({ error: e.message }, true);
+                showModal({ error: e.message }, true);
+            }
+        }
+
+        async function doUpdateProfile() {
+            if (!accessToken) { showModal({ error: '請先登入' }, true); return; }
+            try {
+                const data = await api('PATCH', '/users/me', {
+                    name: document.getElementById('newName').value.trim() || undefined
+                }, true);
+                showResult(data);
+                showModal(data);
+            } catch (e) {
+                showResult({ error: e.message }, true);
+                showModal({ error: e.message }, true);
+            }
+        }
+
+        async function doVerifyEmail() {
+            const token = document.getElementById('verifyToken').value.trim();
+            if (!token) { showModal({ error: '請輸入驗證 Token' }, true); return; }
+            try {
+                const data = await api('POST', '/auth/verify-email', { token });
+                showResult(data);
+                showModal(data);
+            } catch (e) {
+                showResult({ error: e.message }, true);
+                showModal({ error: e.message }, true);
+            }
+        }
+
+        async function doResendVerification() {
+            const email = document.getElementById('resendEmail').value.trim();
+            if (!email) { showModal({ error: '請輸入 Email' }, true); return; }
+            try {
+                const data = await api('POST', '/auth/resend-verification', { email });
+                showResult(data);
+                showModal(data);
+            } catch (e) {
+                showResult({ error: e.message }, true);
+                showModal({ error: e.message }, true);
+            }
+        }
+
+        async function doLogout() {
+            if (!accessToken) { showModal({ error: '請先登入' }, true); return; }
+            try {
+                await api('POST', '/auth/logout', null, true);
+                saveTokens(null, null);
+                showResult({ message: '已登出' });
+                showModal({ message: '已登出' });
+            } catch (e) {
+                saveTokens(null, null);
+                showResult({ error: e.message }, true);
+                showModal({ error: e.message }, true);
+            }
+        }
+
+        async function doDeleteAccount() {
+            if (!accessToken) { showModal({ error: '請先登入' }, true); return; }
+            if (!confirm('確定要刪除帳號？此操作無法復原。')) return;
+            try {
+                await api('DELETE', '/users/me', null, true);
+                saveTokens(null, null);
+                showResult({ message: '帳號已刪除' });
+                showModal({ message: '帳號已刪除' });
+            } catch (e) {
+                showResult({ error: e.message }, true);
+                showModal({ error: e.message }, true);
+            }
+        }
+
+        async function testConnection() {
+            try {
+                const res = await fetch(API + '/users');
+                const ok = res.ok;
+                const data = await res.json().catch(() => ({}));
+                const result = { status: res.status, ok, message: ok ? 'API 連線正常' : (data.message || '連線異常') };
+                showResult(result, !ok);
+                showModal(result, !ok);
+            } catch (e) {
+                const err = { error: e.message, hint: '請確認 LocalAuth 已啟動 (npm run dev)' };
+                showResult(err, true);
+                showModal(err, true);
+            }
+        }
+        document.getElementById('apiUrl').textContent = API;
+    </script>
+</body>
+</html>

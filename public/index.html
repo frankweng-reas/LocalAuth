@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用戶管理系統</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .panel h2 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #555;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            padding: 6px 12px;
+            font-size: 13px;
+            width: auto;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .users-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .user-card {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border: 1px solid #e5e7eb;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .user-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .user-email {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .user-id {
+            color: #999;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .user-date {
+            color: #999;
+            font-size: 12px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            flex: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 用戶管理系統</h1>
+            <p>簡單的用戶管理介面 - 查看、新增和管理用戶 | <a href="/admin/auth-test.html" style="color:#667eea">Auth 功能測試</a></p>
+        </div>
+
+        <div class="content">
+            <div class="panel">
+                <h2>➕ 新增用戶</h2>
+                <div id="createAlert"></div>
+                <form id="createUserForm">
+                    <div class="form-group">
+                        <label>Email *</label>
+                        <input type="email" id="createEmail" required placeholder="user@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>密碼 *</label>
+                        <input type="password" id="createPassword" required placeholder="至少 6 個字元">
+                    </div>
+                    <div class="form-group">
+                        <label>名稱</label>
+                        <input type="text" id="createName" placeholder="選填">
+                    </div>
+                    <button type="submit" class="btn">建立用戶</button>
+                </form>
+            </div>
+
+            <div class="panel">
+                <h2>👥 用戶列表</h2>
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalUsers">0</div>
+                        <div class="stat-label">總用戶數</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="activeUsers">0</div>
+                        <div class="stat-label">活躍用戶</div>
+                    </div>
+                </div>
+                <div id="usersContainer" class="users-list">
+                    <div class="loading">載入中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 支援 ?api=http://localhost:4000 指定 API（Docker 用 port 4000）
+        const API_BASE = (() => {
+            const params = new URLSearchParams(window.location.search);
+            const apiParam = params.get('api');
+            if (apiParam) return apiParam.replace(/\/$/, '');
+            return window.location.origin;
+        })();
+
+        // 載入用戶列表
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/users`);
+                const users = await response.json();
+                
+                displayUsers(users);
+                updateStats(users);
+            } catch (error) {
+                document.getElementById('usersContainer').innerHTML = 
+                    '<div class="empty">❌ 無法載入用戶列表</div>';
+                console.error('Error loading users:', error);
+            }
+        }
+
+        // 顯示用戶列表
+        function displayUsers(users) {
+            const container = document.getElementById('usersContainer');
+            
+            if (users.length === 0) {
+                container.innerHTML = '<div class="empty">📭 目前沒有任何用戶</div>';
+                return;
+            }
+
+            container.innerHTML = users.map(user => `
+                <div class="user-card">
+                    <div class="user-card-header">
+                        <div>
+                            <div class="user-name">${user.name || '未設定名稱'}</div>
+                            ${user.isActive 
+                                ? '<span class="badge badge-success">啟用</span>' 
+                                : '<span class="badge badge-inactive">停用</span>'}
+                        </div>
+                        <button class="btn btn-danger" onclick="deleteUser('${user.id}', '${user.email}')">刪除</button>
+                    </div>
+                    <div class="user-email">📧 ${user.email}</div>
+                    <div class="user-id">ID: ${user.id}</div>
+                    <div class="user-date">📅 建立時間: ${new Date(user.createdAt).toLocaleString('zh-TW')}</div>
+                </div>
+            `).join('');
+        }
+
+        // 更新統計資料
+        function updateStats(users) {
+            document.getElementById('totalUsers').textContent = users.length;
+            document.getElementById('activeUsers').textContent = 
+                users.filter(u => u.isActive).length;
+        }
+
+        // 顯示訊息
+        function showAlert(elementId, message, isError = false) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `
+                <div class="alert ${isError ? 'alert-error' : 'alert-success'}">
+                    ${message}
+                </div>
+            `;
+            setTimeout(() => {
+                element.innerHTML = '';
+            }, 5000);
+        }
+
+        // 建立用戶
+        document.getElementById('createUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('createEmail').value;
+            const password = document.getElementById('createPassword').value;
+            const name = document.getElementById('createName').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password, name: name || undefined }),
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || '建立失敗');
+                }
+
+                showAlert('createAlert', `✅ 成功建立用戶: ${email}`);
+                document.getElementById('createUserForm').reset();
+                loadUsers();
+            } catch (error) {
+                showAlert('createAlert', `❌ ${error.message}`, true);
+            }
+        });
+
+        // 刪除用戶
+        async function deleteUser(id, email) {
+            if (!confirm(`確定要刪除用戶 "${email}" 嗎？\n\n此操作無法復原。`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/users/${id}`, {
+                    method: 'DELETE',
+                });
+
+                if (!response.ok) {
+                    throw new Error('刪除失敗');
+                }
+
+                alert(`✅ 已成功刪除用戶: ${email}`);
+                loadUsers();
+            } catch (error) {
+                alert(`❌ 刪除失敗: ${error.message}`);
+            }
+        }
+
+        // 初始載入
+        loadUsers();
+
+        // 每 30 秒自動重新載入
+        setInterval(loadUsers, 30000);
+    </script>
+</body>
+</html>

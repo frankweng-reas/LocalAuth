@@ -1,0 +1,78 @@
+### 變數定義
+@baseUrl = http://localhost:3000
+@email = test@example.com
+@password = password123
+
+### 1. 註冊新用戶
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "name": "Test User"
+}
+
+### 2. 登入（複製返回的 access_token）
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### 3. 取得個人資料（把下面的 YOUR_TOKEN 替換成實際的 token）
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer YOUR_TOKEN
+
+### 範例：使用真實 token
+# GET {{baseUrl}}/auth/profile
+# Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+###############################################
+# 錯誤測試案例
+###############################################
+
+### 測試重複註冊
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "name": "Test User"
+}
+
+### 測試錯誤密碼
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "wrongpassword"
+}
+
+### 測試無效 token
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer invalid_token
+
+### 測試無效 email 格式
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "invalid-email",
+  "password": "password123",
+  "name": "Test"
+}
+
+### 測試密碼太短
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "new@example.com",
+  "password": "123",
+  "name": "Test"
+}
