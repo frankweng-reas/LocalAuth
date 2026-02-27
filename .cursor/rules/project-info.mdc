@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## GitHub 倉庫
 
-- **SSH**: `git@github.com:frankweng-reas/localauth.git`
+- **SSH**: `git@github.com-reas:frankweng-reas/localauth.git`（使用 github.com-reas 對應 id_ed25519_reas）
 - **HTTPS**: `https://github.com/frankweng-reas/localauth.git`
 
-進行 git push、pull、clone 時請使用上述倉庫位址。SSH 已設定於 frankweng-reas 帳號，可直接使用 `git push origin main`。
+進行 git push、pull、clone 時請使用上述 SSH 位址（github.com-reas），否則會用錯 key 導致 push 失敗。
