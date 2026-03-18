@@ -76,7 +76,7 @@ npm run start:dev
 
 ```bash
 # 註冊新用戶測試
-curl -X POST http://localhost:3000/auth/register \
+curl -X POST http://localhost:4000/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "test@yourdomain.com",
@@ -113,13 +113,20 @@ private async sendViaSendGrid(to: string, subject: string, html: string) {
 }
 ```
 
-### Gmail SMTP
+### Gmail SMTP / Gmail SMTP Relay
 
-⚠️ 不推薦用於生產環境（容易被標記為垃圾郵件）
+**Gmail SMTP Relay**（適用 Google Workspace，如 reas.com.tw）：
 
-1. 啟用 Gmail「低安全性應用程式存取」或使用應用程式密碼
-2. 安裝套件：`npm install nodemailer`
-3. 更新 `.env`：
+```bash
+EMAIL_PROVIDER=smtp
+SMTP_HOST=smtp-relay.gmail.com
+SMTP_PORT=587
+SMTP_USER=developer@reas.com.tw
+SMTP_PASS=your-app-password
+EMAIL_FROM="Neurosme AI" <neurosme@reas.com.tw>
+```
+
+**一般 Gmail SMTP**（⚠️ 不推薦用於生產環境）：
 
 ```bash
 EMAIL_PROVIDER=smtp
@@ -129,6 +136,8 @@ SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
 EMAIL_FROM=your-email@gmail.com
 ```
+
+**測試 SMTP 寄信**：設定好 `.env` 後執行 `docker compose up -d app` 重啟，再執行 `./test-smtp-email.sh your-email@example.com`。
 
 ---
 
@@ -151,12 +160,12 @@ curl -X POST http://localhost:3000/auth/register \
 # 2. 檢查郵箱或 console 日誌取得驗證 token
 
 # 3. 驗證 email
-curl -X POST http://localhost:3000/auth/verify-email \
+curl -X POST http://localhost:4000/auth/verify-email \
   -H "Content-Type: application/json" \
   -d '{"token":"your-verification-token"}'
 
 # 4. 重新發送驗證郵件
-curl -X POST http://localhost:3000/auth/resend-verification \
+curl -X POST http://localhost:4000/auth/resend-verification \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com"}'
 ```

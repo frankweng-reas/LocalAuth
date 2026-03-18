@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as nodemailer from 'nodemailer';
 import { Resend } from 'resend';
 
 type EmailProvider = 'console' | 'resend' | 'sendgrid' | 'smtp';
@@ -9,6 +10,7 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly provider: EmailProvider;
   private resend?: Resend;
+  private smtpTransporter?: nodemailer.Transporter;
 
   constructor(private readonly configService: ConfigService) {
     this.provider = this.configService.get<EmailProvider>('EMAIL_PROVIDER') || 'console';
@@ -22,6 +24,26 @@ export class EmailService {
       } else {
         this.resend = new Resend(apiKey);
         this.logger.log('✅ Resend email service initialized');
+      }
+    }
+
+    // 初始化 SMTP（支援 Gmail SMTP Relay）
+    if (this.provider === 'smtp') {
+      const host = this.configService.get<string>('SMTP_HOST');
+      const user = this.configService.get<string>('SMTP_USER');
+      const pass = this.configService.get<string>('SMTP_PASS');
+      if (!host || !user || !pass) {
+        this.logger.warn('SMTP_HOST, SMTP_USER, SMTP_PASS not set, falling back to console mode');
+        this.provider = 'console';
+      } else {
+        const port = this.configService.get<number>('SMTP_PORT') || 587;
+        this.smtpTransporter = nodemailer.createTransport({
+          host,
+          port,
+          secure: port === 465,
+          auth: { user, pass },
+        });
+        this.logger.log(`✅ SMTP email service initialized (${host}:${port})`);
       }
     }
   }
@@ -44,6 +66,9 @@ export class EmailService {
     switch (this.provider) {
       case 'resend':
         await this.sendViaResend(email, subject, html, text);
+        break;
+      case 'smtp':
+        await this.sendViaSmtp(email, subject, html, text);
         break;
       case 'console':
       default:
@@ -84,6 +109,37 @@ export class EmailService {
       this.logger.log(`✅ Email sent via Resend to ${to} (ID: ${data?.id})`);
     } catch (error) {
       this.logger.error('Error sending email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 透過 SMTP 發送郵件（支援 Gmail SMTP Relay）
+   */
+  private async sendViaSmtp(
+    to: string,
+    subject: string,
+    html: string,
+    text: string,
+  ): Promise<void> {
+    if (!this.smtpTransporter) {
+      throw new Error('SMTP not initialized');
+    }
+
+    const from = this.configService.get<string>('EMAIL_FROM') || 'noreply@localhost';
+
+    try {
+      const info = await this.smtpTransporter.sendMail({
+        from,
+        to,
+        subject,
+        html,
+        text,
+      });
+
+      this.logger.log(`✅ Email sent via SMTP to ${to} (MessageID: ${info.messageId})`);
+    } catch (error) {
+      this.logger.error('Failed to send email via SMTP:', error);
       throw error;
     }
   }

@@ -199,7 +199,33 @@ npm run start:dev
 
 ## API 端點
 
-### 註冊新用戶
+### 端點總覽
+
+| 分類 | 方法 | 端點 | 說明 | 需登入 |
+|------|------|------|------|--------|
+| **認證** | POST | `/auth/register` | 註冊新用戶 | ❌ |
+| | POST | `/auth/login` | 登入 | ❌ |
+| | POST | `/auth/refresh` | 刷新 access token | ❌ |
+| | POST | `/auth/validate-token` | 驗證 token 是否有效 | ❌ |
+| | GET | `/auth/profile` | 取得個人資料 | ✅ |
+| | GET | `/auth/userinfo` | 取得用戶資訊（OIDC 風格） | ✅ |
+| | PATCH | `/auth/password` | 修改密碼 | ✅ |
+| | POST | `/auth/logout` | 登出 | ✅ |
+| | POST | `/auth/revoke-all-sessions` | 撤銷所有 session | ✅ |
+| | POST | `/auth/verify-email` | 驗證 Email | ❌ |
+| | GET | `/auth/verify-email?token=xxx` | 驗證 Email（GET） | ❌ |
+| | POST | `/auth/resend-verification` | 重新發送驗證信 | ❌ |
+| **用戶** | GET | `/users` | 列出所有用戶 | ❌ |
+| | GET | `/users/:id` | 取得單一用戶 | ❌ |
+| | DELETE | `/users/:id` | 刪除用戶 | ❌ |
+| | PATCH | `/users/me` | 更新個人資料 | ✅ |
+| | DELETE | `/users/me` | 刪除自己的帳號 | ✅ |
+
+---
+
+### 認證端點
+
+#### 註冊新用戶
 
 **POST** `/auth/register`
 
@@ -216,15 +242,18 @@ Response:
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
     "id": "uuid",
     "email": "user@example.com",
-    "name": "John Doe"
-  }
+    "name": "John Doe",
+    "emailVerified": false
+  },
+  "message": "Registration successful. Please check your email to verify your account."
 }
 ```
 
-### 用戶登入
+#### 用戶登入
 
 **POST** `/auth/login`
 
@@ -240,6 +269,7 @@ Response:
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
     "id": "uuid",
     "email": "user@example.com",
@@ -248,7 +278,54 @@ Response:
 }
 ```
 
-### 取得個人資料 (受保護)
+#### 刷新 Token
+
+**POST** `/auth/refresh`
+
+Request Body:
+```json
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+Response:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+#### 驗證 Token
+
+**POST** `/auth/validate-token`
+
+Request Body:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+Response（有效）:
+```json
+{
+  "valid": true,
+  "userId": "uuid",
+  "email": "user@example.com",
+  "name": "John Doe"
+}
+```
+
+Response（無效）:
+```json
+{
+  "valid": false
+}
+```
+
+#### 取得個人資料
 
 **GET** `/auth/profile`
 
@@ -266,7 +343,123 @@ Response:
 }
 ```
 
-### 管理端點
+#### 取得用戶資訊（OIDC 風格）
+
+**GET** `/auth/userinfo`
+
+Headers:
+```
+Authorization: Bearer <access_token>
+```
+
+Response:
+```json
+{
+  "sub": "uuid",
+  "email": "user@example.com",
+  "name": "John Doe",
+  "email_verified": true
+}
+```
+
+#### 修改密碼
+
+**PATCH** `/auth/password`
+
+Headers:
+```
+Authorization: Bearer <access_token>
+```
+
+Request Body:
+```json
+{
+  "old_password": "currentPassword123",
+  "new_password": "newPassword456"
+}
+```
+
+Response:
+```json
+{
+  "message": "Password updated successfully"
+}
+```
+
+#### 登出
+
+**POST** `/auth/logout`
+
+Headers:
+```
+Authorization: Bearer <access_token>
+```
+
+Response:
+```json
+{
+  "message": "Logged out successfully"
+}
+```
+
+#### 撤銷所有 Session
+
+**POST** `/auth/revoke-all-sessions`
+
+Headers:
+```
+Authorization: Bearer <access_token>
+```
+
+Response:
+```json
+{
+  "message": "All sessions revoked successfully"
+}
+```
+
+#### 驗證 Email
+
+**POST** `/auth/verify-email`
+
+Request Body:
+```json
+{
+  "token": "verification_token_from_email"
+}
+```
+
+**GET** `/auth/verify-email?token=verification_token_from_email`
+
+Response:
+```json
+{
+  "message": "Email verified successfully",
+  "email": "user@example.com"
+}
+```
+
+#### 重新發送驗證信
+
+**POST** `/auth/resend-verification`
+
+Request Body:
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+Response:
+```json
+{
+  "message": "Verification email sent successfully"
+}
+```
+
+---
+
+### 用戶管理端點
 
 #### 列出所有用戶
 
@@ -296,6 +489,37 @@ Response: 同上單一用戶物件
 **DELETE** `/users/:id`
 
 Response: 204 No Content
+
+#### 更新個人資料
+
+**PATCH** `/users/me`
+
+Headers:
+```
+Authorization: Bearer <access_token>
+```
+
+Request Body:
+```json
+{
+  "name": "New Name"
+}
+```
+
+Response: 更新後的用戶物件
+
+#### 刪除自己的帳號
+
+**DELETE** `/users/me`
+
+Headers:
+```
+Authorization: Bearer <access_token>
+```
+
+Response: 204 No Content
+
+---
 
 ## 測試指令
 
@@ -345,16 +569,48 @@ curl http://localhost:3000/auth/profile \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
+#### 4. 刷新 Token
+
+```bash
+curl -X POST http://localhost:3000/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "YOUR_REFRESH_TOKEN"}'
+```
+
+#### 5. 修改密碼
+
+```bash
+curl -X PATCH http://localhost:3000/auth/password \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "old_password": "password123",
+    "new_password": "newPassword456"
+  }'
+```
+
+#### 6. 驗證 Token
+
+```bash
+curl -X POST http://localhost:3000/auth/validate-token \
+  -H "Content-Type: application/json" \
+  -d '{"token": "YOUR_ACCESS_TOKEN"}'
+```
+
 ## 資料庫 Schema
 
 ```prisma
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  name         String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  id                        String    @id @default(uuid())
+  email                     String    @unique
+  passwordHash              String
+  name                      String?
+  isActive                  Boolean   @default(true)
+  emailVerified             Boolean   @default(false)
+  verificationToken         String?
+  verificationTokenExpires  DateTime?
+  createdAt                 DateTime  @default(now())
+  refreshToken              String?
 }
 ```
 
@@ -374,9 +630,7 @@ model User {
 - **SSO/LDAP**: 在 AuthModule 新增認證策略
 - **RBAC**: User 模型可新增 `role` 欄位
 - **Multi-tenant**: 可新增 `tenantId` 欄位
-- **Refresh Token**: 可新增 refresh token 機制
-- **Email 驗證**: 可新增 email 驗證流程
-- **密碼重設**: 可新增密碼重設功能
+- **密碼重設**: 可新增密碼重設功能（忘記密碼流程）
 
 ## 其他指令
 
