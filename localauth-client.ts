@@ -18,6 +18,11 @@ export interface AuthResponse {
   message?: string;
 }
 
+/** 註冊回應：需先完成 email 確認才能登入，不回傳 token */
+export interface RegisterResponse {
+  message: string;
+}
+
 export interface LoginCredentials {
   email: string;
   password: string;
@@ -44,9 +49,9 @@ export class LocalAuthClient {
   }
 
   /**
-   * 註冊新用戶
+   * 註冊新用戶（需先完成 email 確認才能登入，不回傳 token）
    */
-  async register(data: RegisterData): Promise<AuthResponse> {
+  async register(data: RegisterData): Promise<RegisterResponse> {
     const response = await fetch(`${this.baseUrl}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -58,11 +63,7 @@ export class LocalAuthClient {
       throw new Error(error.message || 'Registration failed');
     }
 
-    const result: AuthResponse = await response.json();
-    
-    // 自動儲存 token
-    this.saveTokens(result.access_token, result.refresh_token);
-    
+    const result: RegisterResponse = await response.json();
     return result;
   }
 

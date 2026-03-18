@@ -141,6 +141,30 @@ EMAIL_FROM=your-email@gmail.com
 
 ---
 
+## ✉️ 自訂驗證郵件內容
+
+可透過環境變數自訂驗證信主旨與內容，`{{name}}` 會替換為用戶名稱：
+
+| 變數 | 說明 | 預設值 |
+|------|------|--------|
+| `EMAIL_VERIFY_SUBJECT` | 主旨 | 請驗證您的 Email |
+| `EMAIL_VERIFY_GREETING` | 開頭問候 | Hi {{name}}, |
+| `EMAIL_VERIFY_BODY` | 主要說明 | 感謝您註冊！請點擊下方按鈕驗證您的 Email： |
+| `EMAIL_VERIFY_BUTTON` | 按鈕文字 | 驗證 Email |
+| `EMAIL_VERIFY_FOOTER` | 頁尾 | 如果您沒有註冊此帳號，請忽略此郵件。 |
+
+**Neurosme AI 範例**（含空格的値需加引號，供 `source .env` 或測試腳本使用）：
+
+```bash
+EMAIL_VERIFY_SUBJECT="歡迎加入 Neurosme AI - 請驗證您的 Email"
+EMAIL_VERIFY_GREETING="Hi {{name}}，歡迎加入 Neurosme AI！"
+EMAIL_VERIFY_BODY="感謝您註冊 Neurosme AI！請點擊下方按鈕完成 Email 驗證，即可開始使用。"
+EMAIL_VERIFY_BUTTON="立即驗證 Email"
+EMAIL_VERIFY_FOOTER="若您未註冊 Neurosme AI，請忽略此郵件。"
+```
+
+---
+
 ## 🧪 測試郵件功能
 
 ### 方式 1: 使用測試腳本

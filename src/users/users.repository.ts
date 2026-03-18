@@ -10,12 +10,14 @@ export class UsersRepository {
     email: string,
     passwordHash: string,
     name?: string,
+    emailVerified = false,
   ): Promise<User> {
     return this.prisma.user.create({
       data: {
         email,
         passwordHash,
         name,
+        emailVerified,
       },
     });
   }

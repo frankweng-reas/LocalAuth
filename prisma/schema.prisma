@@ -25,3 +25,14 @@ model User {
   createdAt                 DateTime  @default(now())
   refreshToken              String?   @db.Text
 }
+
+/// 待驗證註冊：僅在 email 確認後才建立 User
+model PendingRegistration {
+  id                        String    @id @default(uuid())
+  email                     String    @unique
+  passwordHash              String
+  name                      String?
+  verificationToken         String    @db.Text
+  verificationTokenExpires  DateTime
+  createdAt                 DateTime  @default(now())
+}

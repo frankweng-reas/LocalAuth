@@ -13,6 +13,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { UsersService } from '../users/users.service';
 import { UsersRepository } from '../users/users.repository';
+import { PendingRegistrationRepository } from '../users/pending-registration.repository';
 import { EmailService } from '../email/email.service';
 import { IAuthProvider } from './providers/auth-provider.interface';
 import { RegisterDto } from './dto/register.dto';
@@ -29,6 +30,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly usersRepository: UsersRepository,
+    private readonly pendingRegistrationRepository: PendingRegistrationRepository,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
@@ -42,26 +44,29 @@ export class AuthService {
 
     const { email, password, name } = registerDto;
 
-    // Check if user already exists
+    // Check if user or pending registration already exists
     const existingUser = await this.usersService.findByEmail(email);
     if (existingUser) {
+      throw new ConflictException('Email already registered');
+    }
+    const existingPending = await this.pendingRegistrationRepository.findByEmail(email);
+    if (existingPending) {
       throw new ConflictException('Email already registered');
     }
 
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create user
-    const user = await this.usersService.create(email, passwordHash, name);
-
     // Generate verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const tokenExpires = new Date();
     tokenExpires.setHours(tokenExpires.getHours() + 24); // 24 小時有效
 
-    // Save verification token
-    await this.usersRepository.setVerificationToken(
-      user.id,
+    // 寫入 PendingRegistration，不寫入 User（email 確認後才建立 User）
+    await this.pendingRegistrationRepository.create(
+      email,
+      passwordHash,
+      name,
       verificationToken,
       tokenExpires,
     );
@@ -73,22 +78,7 @@ export class AuthService {
       name,
     );
 
-    // Generate tokens
-    const access_token = this.generateAccessToken(user);
-    const refresh_token = this.generateRefreshToken(user);
-
-    // Store refresh token
-    await this.usersRepository.updateRefreshToken(user.id, refresh_token);
-
     return {
-      access_token,
-      refresh_token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        emailVerified: false,
-      },
       message: 'Registration successful. Please check your email to verify your account.',
     };
   }
@@ -99,6 +89,15 @@ export class AuthService {
     for (const provider of this.authProviders) {
       const user = await provider.validateCredentials(email, password);
       if (user) {
+        // 本地註冊用戶需先完成 email 確認才能登入（AD 用戶不在此限）
+        if (
+          !user.passwordHash.startsWith('AD_') &&
+          !user.emailVerified
+        ) {
+          throw new UnauthorizedException(
+            '請先至信箱確認您的註冊，確認後即可登入',
+          );
+        }
         const access_token = this.generateAccessToken(user);
         const refresh_token = this.generateRefreshToken(user);
         await this.usersRepository.updateRefreshToken(user.id, refresh_token);
@@ -217,34 +216,41 @@ export class AuthService {
   async verifyEmail(verifyEmailDto: VerifyEmailDto) {
     const { token } = verifyEmailDto;
 
-    // Find user by verification token
-    const user = await this.usersRepository.findByVerificationToken(token);
+    // Find pending registration by verification token
+    const pending = await this.pendingRegistrationRepository.findByVerificationToken(token);
     
-    if (!user) {
+    if (!pending) {
       throw new BadRequestException('Invalid or expired verification token');
     }
 
-    // Mark email as verified
+    // 建立 User（email 已確認後才寫入 User table）
+    const user = await this.usersService.create(
+      pending.email,
+      pending.passwordHash,
+      pending.name ?? undefined,
+      true, // emailVerified：用戶已透過驗證連結完成確認
+    );
+
+    // 明確標記為已驗證（雙重確保 emailVerified 正確寫入）
     await this.usersRepository.markEmailAsVerified(user.id);
+
+    // 刪除待驗證記錄
+    await this.pendingRegistrationRepository.delete(pending.id);
 
     return {
       message: 'Email verified successfully',
-      email: user.email,
+      email: pending.email,
     };
   }
 
   async resendVerification(resendVerificationDto: ResendVerificationDto) {
     const { email } = resendVerificationDto;
 
-    // Find user
-    const user = await this.usersRepository.findByEmail(email);
+    // Find pending registration（待驗證註冊在 PendingRegistration，不在 User）
+    const pending = await this.pendingRegistrationRepository.findByEmail(email);
     
-    if (!user) {
+    if (!pending) {
       throw new NotFoundException('User not found');
-    }
-
-    if (user.emailVerified) {
-      throw new BadRequestException('Email already verified');
     }
 
     // Generate new verification token
@@ -253,8 +259,8 @@ export class AuthService {
     tokenExpires.setHours(tokenExpires.getHours() + 24); // 24 小時有效
 
     // Save verification token
-    await this.usersRepository.setVerificationToken(
-      user.id,
+    await this.pendingRegistrationRepository.updateVerificationToken(
+      pending.id,
       verificationToken,
       tokenExpires,
     );
@@ -263,7 +269,7 @@ export class AuthService {
     await this.emailService.sendVerificationEmail(
       email,
       verificationToken,
-      user.name ?? undefined,
+      pending.name ?? undefined,
     );
 
     return {

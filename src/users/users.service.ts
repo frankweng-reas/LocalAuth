@@ -18,8 +18,9 @@ export class UsersService {
     email: string,
     passwordHash: string,
     name?: string,
+    emailVerified = false,
   ): Promise<UserResponse> {
-    const user = await this.usersRepository.create(email, passwordHash, name);
+    const user = await this.usersRepository.create(email, passwordHash, name, emailVerified);
     return this.excludePassword(user);
   }
 

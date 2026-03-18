@@ -58,10 +58,24 @@ export class EmailService {
   ): Promise<void> {
     const baseUrl = this.configService.get<string>('BASE_URL') || 'http://localhost:3000';
     const verificationUrl = `${baseUrl}/auth/verify-email?token=${token}`;
-    
-    const subject = '請驗證您的 Email';
-    const html = this.generateVerificationEmailHtml(verificationUrl, name, token);
-    const text = this.generateVerificationEmailText(verificationUrl, name, token);
+
+    const subject =
+      this.configService.get<string>('EMAIL_VERIFY_SUBJECT') ||
+      '請驗證您的 Email';
+    const appName =
+      this.configService.get<string>('EMAIL_VERIFY_APP_NAME') || '我們';
+    const html = this.generateVerificationEmailHtml(
+      verificationUrl,
+      name,
+      token,
+      appName,
+    );
+    const text = this.generateVerificationEmailText(
+      verificationUrl,
+      name,
+      token,
+      appName,
+    );
 
     switch (this.provider) {
       case 'resend':
@@ -172,7 +186,24 @@ export class EmailService {
     verificationUrl: string,
     name?: string,
     token?: string,
+    appName?: string,
   ): string {
+    const greetingTemplate =
+      this.configService.get<string>('EMAIL_VERIFY_GREETING') ||
+      `Hi ${name || 'User'},`;
+    const greeting = greetingTemplate.replace(
+      /\{\{name\}\}/g,
+      name || 'User',
+    );
+    const body =
+      this.configService.get<string>('EMAIL_VERIFY_BODY') ||
+      '感謝您註冊！請點擊下方按鈕驗證您的 Email：';
+    const buttonText =
+      this.configService.get<string>('EMAIL_VERIFY_BUTTON') || '驗證 Email';
+    const footer =
+      this.configService.get<string>('EMAIL_VERIFY_FOOTER') ||
+      '如果您沒有註冊此帳號，請忽略此郵件。';
+
     return `
       <!DOCTYPE html>
       <html>
@@ -203,14 +234,14 @@ export class EmailService {
       <body>
         <div class="container">
           <h2>Email 驗證</h2>
-          <p>Hi ${name || 'User'},</p>
-          <p>感謝您註冊！請點擊下方按鈕驗證您的 Email：</p>
-          <a href="${verificationUrl}" class="button">驗證 Email</a>
+          <p>${greeting}</p>
+          <p>${body}</p>
+          <a href="${verificationUrl}" class="button" style="color: #ffffff !important;">${buttonText}</a>
           <p>或複製以下連結到瀏覽器：</p>
           <div class="token">${verificationUrl}</div>
           <p>此連結將在 <strong>24 小時</strong>後過期。</p>
           <div class="footer">
-            <p>如果您沒有註冊此帳號，請忽略此郵件。</p>
+            <p>${footer}</p>
           </div>
         </div>
       </body>
@@ -225,11 +256,26 @@ export class EmailService {
     verificationUrl: string,
     name?: string,
     token?: string,
+    appName?: string,
   ): string {
-    return `
-Hi ${name || 'User'},
+    const greetingTemplate =
+      this.configService.get<string>('EMAIL_VERIFY_GREETING') ||
+      `Hi ${name || 'User'},`;
+    const greeting = greetingTemplate.replace(
+      /\{\{name\}\}/g,
+      name || 'User',
+    );
+    const body =
+      this.configService.get<string>('EMAIL_VERIFY_BODY') ||
+      '感謝您註冊！請點擊以下連結驗證您的 Email：';
+    const footer =
+      this.configService.get<string>('EMAIL_VERIFY_FOOTER') ||
+      '如果您沒有註冊此帳號，請忽略此郵件。';
 
-感謝您註冊！請點擊以下連結驗證您的 Email：
+    return `
+${greeting}
+
+${body}
 
 ${verificationUrl}
 
@@ -238,7 +284,7 @@ Token: ${token}
 
 此連結將在 24 小時後過期。
 
-如果您沒有註冊此帳號，請忽略此郵件。
+${footer}
     `.trim();
   }
 

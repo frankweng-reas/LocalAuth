@@ -64,8 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
       setLoading(true);
-      const response = await authClient.register(data);
-      setUser(response.user);
+      await authClient.register(data);
+      // 註冊成功後不自動登入，需先完成 email 確認
     } catch (err: any) {
       setError(err.message);
       throw err;
