@@ -51,7 +51,7 @@ docker exec localauth-db-1 psql -U postgres -d localauth -c "DELETE FROM \"User\
 echo "1. 註冊新用戶（觸發寄信）"
 REG=$(curl -s -X POST http://localhost:4000/auth/register \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"pass123\",\"name\":\"SMTP Test\"}")
+  -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"test@000\",\"name\":\"SMTP Test\"}")
 
 echo "$REG" | python3 -m json.tool 2>/dev/null || echo "$REG"
 echo ""

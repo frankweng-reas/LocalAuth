@@ -11,6 +11,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -31,6 +32,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly usersService: UsersService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Post('register')
@@ -227,6 +229,8 @@ export class AuthController {
   private getResetPasswordHtml(error: string | null, token: string | null): string {
     // 表單 POST 使用相對路徑，與當前頁面同源
     const apiPath = '/auth/reset-password';
+    const baseUrl = this.configService.get<string>('BASE_URL') || 'http://localhost:4000';
+    const loginUrl = `${baseUrl.replace(/\/$/, '')}/login`;
     const title = error ? '重設密碼失敗' : '重設密碼';
     const formHtml = token
       ? `
@@ -263,7 +267,7 @@ export class AuthController {
               });
               const data = await r.json();
               if (r.ok) {
-                result.innerHTML = '<p style="color: #10b981;">✅ ' + (data.message || '密碼已重設') + '</p><p><a href="/auth-test.html">前往登入</a></p>';
+                result.innerHTML = '<p style="color: #10b981;">✅ ' + (data.message || '密碼已重設') + '</p><p><a href="${loginUrl}">前往登入</a></p>';
                 e.target.remove();
               } else {
                 result.innerHTML = '<p style="color: #ef4444;">❌ ' + (data.message || data.error || '重設失敗') + '</p>';
