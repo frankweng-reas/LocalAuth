@@ -1,7 +1,12 @@
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 import { IsPasswordPolicy } from '../utils/password-validator';
 
-export class ChangePasswordDto {
+/** 密碼過期時強制更換密碼（不需 JWT） */
+export class ChangePasswordExpiredDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
   @IsString()
   @IsNotEmpty()
   old_password: string;

@@ -18,6 +18,7 @@ export class UsersRepository {
         passwordHash,
         name,
         emailVerified,
+        passwordChangedAt: new Date(), // 新用戶密碼視為剛設定
       },
     });
   }
@@ -65,7 +66,10 @@ export class UsersRepository {
   async updatePassword(id: string, passwordHash: string): Promise<User> {
     return this.prisma.user.update({
       where: { id },
-      data: { passwordHash },
+      data: {
+        passwordHash,
+        passwordChangedAt: new Date(),
+      },
     });
   }
 
@@ -108,6 +112,41 @@ export class UsersRepository {
         emailVerified: true,
         verificationToken: null,
         verificationTokenExpires: null,
+      },
+    });
+  }
+
+  async setPasswordResetToken(
+    id: string,
+    token: string,
+    expiresAt: Date,
+  ): Promise<User> {
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        passwordResetToken: token,
+        passwordResetTokenExpires: expiresAt,
+      },
+    });
+  }
+
+  async findByPasswordResetToken(token: string): Promise<User | null> {
+    return this.prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetTokenExpires: {
+          gt: new Date(),
+        },
+      },
+    });
+  }
+
+  async clearPasswordResetToken(id: string): Promise<User> {
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        passwordResetToken: null,
+        passwordResetTokenExpires: null,
       },
     });
   }

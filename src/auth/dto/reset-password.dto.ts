@@ -1,10 +1,10 @@
 import { IsNotEmpty, IsString, MinLength } from 'class-validator';
 import { IsPasswordPolicy } from '../utils/password-validator';
 
-export class ChangePasswordDto {
+export class ResetPasswordDto {
   @IsString()
   @IsNotEmpty()
-  old_password: string;
+  token: string;
 
   @IsString()
   @IsNotEmpty()

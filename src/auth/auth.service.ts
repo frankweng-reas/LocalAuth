@@ -20,8 +20,11 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { ChangePasswordExpiredDto } from './dto/change-password-expired.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 export const AUTH_PROVIDERS = 'AUTH_PROVIDERS';
 
@@ -86,6 +89,8 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
+    const PASSWORD_EXPIRY_DAYS = 90;
+
     for (const provider of this.authProviders) {
       const user = await provider.validateCredentials(email, password);
       if (user) {
@@ -97,6 +102,20 @@ export class AuthService {
           throw new UnauthorizedException(
             '請先至信箱確認您的註冊，確認後即可登入',
           );
+        }
+        // 本地用戶密碼 90 天到期檢查（AD 用戶不在此限）
+        if (!user.passwordHash.startsWith('AD_')) {
+          const passwordChangedAt = (user as { passwordChangedAt?: Date | null })
+            .passwordChangedAt;
+          const isExpired =
+            !passwordChangedAt ||
+            Date.now() - new Date(passwordChangedAt).getTime() >
+              PASSWORD_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+          if (isExpired) {
+            throw new ForbiddenException(
+              '密碼已過期，請更換密碼',
+            );
+          }
         }
         const access_token = this.generateAccessToken(user);
         const refresh_token = this.generateRefreshToken(user);
@@ -201,6 +220,45 @@ export class AuthService {
     return { message: 'Password updated successfully' };
   }
 
+  /** 密碼過期時強制更換（不需登入） */
+  async changePasswordExpired(dto: ChangePasswordExpiredDto) {
+    const { email, old_password, new_password } = dto;
+
+    const user = await this.usersRepository.findByEmail(email);
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.passwordHash.startsWith('AD_')) {
+      throw new BadRequestException('AD users cannot change password here');
+    }
+
+    const isPasswordValid = await bcrypt.compare(old_password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const PASSWORD_EXPIRY_DAYS = 90;
+    const passwordChangedAt = (user as { passwordChangedAt?: Date | null })
+      .passwordChangedAt;
+    const isExpired =
+      !passwordChangedAt ||
+      Date.now() - new Date(passwordChangedAt).getTime() >
+        PASSWORD_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+
+    if (!isExpired) {
+      throw new BadRequestException(
+        '密碼尚未過期，請使用一般修改密碼功能',
+      );
+    }
+
+    const newPasswordHash = await bcrypt.hash(new_password, 10);
+    await this.usersRepository.updatePassword(user.id, newPasswordHash);
+    await this.usersRepository.updateRefreshToken(user.id, null);
+
+    return { message: 'Password updated successfully' };
+  }
+
   async logout(userId: string) {
     // Revoke refresh token to prevent further token refreshing
     await this.usersRepository.updateRefreshToken(userId, null);
@@ -275,6 +333,54 @@ export class AuthService {
     return {
       message: 'Verification email sent successfully',
     };
+  }
+
+  /** 忘記密碼：寄出重設連結（為防 email 枚舉，無論是否存在皆回傳成功） */
+  async forgotPassword(dto: ForgotPasswordDto) {
+    if (this.configService.get<string>('AD_ENABLED') === 'true') {
+      throw new ForbiddenException('Password reset is disabled when AD is enabled');
+    }
+
+    const user = await this.usersRepository.findByEmail(dto.email);
+    if (!user) {
+      return { message: '若該信箱已註冊，您將收到密碼重設郵件' };
+    }
+
+    if (user.passwordHash.startsWith('AD_')) {
+      return { message: '若該信箱已註冊，您將收到密碼重設郵件' };
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 1); // 1 小時有效
+
+    await this.usersRepository.setPasswordResetToken(user.id, token, expiresAt);
+    await this.emailService.sendPasswordResetEmail(
+      user.email,
+      token,
+      user.name ?? undefined,
+    );
+
+    return { message: '若該信箱已註冊，您將收到密碼重設郵件' };
+  }
+
+  /** 重設密碼：以 token 設定新密碼 */
+  async resetPassword(dto: ResetPasswordDto) {
+    const user = await this.usersRepository.findByPasswordResetToken(dto.token);
+    if (!user) {
+      throw new BadRequestException('連結無效或已過期，請重新申請重設密碼');
+    }
+
+    if (user.passwordHash.startsWith('AD_')) {
+      throw new BadRequestException('AD users cannot reset password here');
+    }
+
+    const newPasswordHash = await bcrypt.hash(dto.new_password, 10);
+    await this.usersRepository.updatePassword(user.id, newPasswordHash);
+    await this.usersRepository.clearPasswordResetToken(user.id);
+    await this.usersRepository.updateRefreshToken(user.id, null);
+
+    return { message: '密碼已重設成功，請使用新密碼登入' };
   }
 
   private generateAccessToken(user: { id: string; email: string }): string {

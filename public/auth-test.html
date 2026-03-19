@@ -219,12 +219,22 @@
             </div>
 
             <div class="card">
-                <h2>9️⃣ 登出</h2>
+                <h2>9️⃣ 忘記密碼</h2>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="forgotEmail" placeholder="user@example.com">
+                </div>
+                <button type="button" class="btn-secondary" onclick="doForgotPassword()">寄出重設連結</button>
+                <p style="font-size: 12px; color: #888; margin-top: 8px;">信件會寄到 console（開發模式）或設定的信箱</p>
+            </div>
+
+            <div class="card">
+                <h2>🔟 登出</h2>
                 <button type="button" class="btn-secondary" onclick="doLogout()">POST /auth/logout</button>
             </div>
 
             <div class="card">
-                <h2>🔟 刪除帳號</h2>
+                <h2>1️⃣1️⃣ 刪除帳號</h2>
                 <button type="button" class="btn-danger" onclick="doDeleteAccount()">DELETE /users/me</button>
             </div>
         </div>
@@ -449,6 +459,19 @@
             if (!email) { showModal({ error: '請輸入 Email' }, true); return; }
             try {
                 const data = await api('POST', '/auth/resend-verification', { email });
+                showResult(data);
+                showModal(data);
+            } catch (e) {
+                showResult({ error: e.message }, true);
+                showModal({ error: e.message }, true);
+            }
+        }
+
+        async function doForgotPassword() {
+            const email = document.getElementById('forgotEmail').value.trim();
+            if (!email) { showModal({ error: '請輸入 Email' }, true); return; }
+            try {
+                const data = await api('POST', '/auth/forgot-password', { email });
                 showResult(data);
                 showModal(data);
             } catch (e) {

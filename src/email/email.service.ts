@@ -290,7 +290,6 @@ ${footer}
 
   /**
    * 發送密碼重設郵件
-   * （未來功能預留）
    */
   async sendPasswordResetEmail(
     email: string,
@@ -300,11 +299,93 @@ ${footer}
     const baseUrl = this.configService.get<string>('BASE_URL') || 'http://localhost:3000';
     const resetUrl = `${baseUrl}/auth/reset-password?token=${token}`;
 
-    this.logger.log('========================================');
-    this.logger.log('🔑 Password Reset Email (SIMULATED)');
-    this.logger.log('========================================');
-    this.logger.log(`To: ${email}`);
-    this.logger.log(`Reset URL: ${resetUrl}`);
-    this.logger.log('========================================');
+    const subject =
+      this.configService.get<string>('EMAIL_RESET_SUBJECT') ||
+      '重設您的密碼';
+    const html = this.generatePasswordResetEmailHtml(resetUrl, name);
+    const text = this.generatePasswordResetEmailText(resetUrl, name);
+
+    switch (this.provider) {
+      case 'resend':
+        await this.sendViaResend(email, subject, html, text);
+        break;
+      case 'smtp':
+        await this.sendViaSmtp(email, subject, html, text);
+        break;
+      case 'console':
+      default:
+        this.logger.log('========================================');
+        this.logger.log('🔑 Password Reset Email (CONSOLE MODE)');
+        this.logger.log('========================================');
+        this.logger.log(`To: ${email}`);
+        this.logger.log(`Subject: ${subject}`);
+        this.logger.log(`Reset URL: ${resetUrl}`);
+        this.logger.log('========================================');
+        break;
+    }
+  }
+
+  private generatePasswordResetEmailHtml(resetUrl: string, name?: string): string {
+    const greeting = `Hi ${name || 'User'},`;
+    const body = '您要求重設密碼，請點擊下方按鈕設定新密碼：';
+    const buttonText = '重設密碼';
+    const footer = '如果您沒有要求重設密碼，請忽略此郵件。此連結將在 1 小時後過期。';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .button { 
+            display: inline-block; 
+            padding: 12px 24px; 
+            background: #4F46E5; 
+            color: white; 
+            text-decoration: none; 
+            border-radius: 5px;
+            margin: 20px 0;
+          }
+          .token { 
+            background: #f3f4f6; 
+            padding: 10px; 
+            border-radius: 5px; 
+            font-family: monospace;
+            word-break: break-all;
+          }
+          .footer { margin-top: 30px; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h2>重設密碼</h2>
+          <p>${greeting}</p>
+          <p>${body}</p>
+          <a href="${resetUrl}" class="button" style="color: #ffffff !important;">${buttonText}</a>
+          <p>或複製以下連結到瀏覽器：</p>
+          <div class="token">${resetUrl}</div>
+          <div class="footer">
+            <p>${footer}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private generatePasswordResetEmailText(resetUrl: string, name?: string): string {
+    return `
+Hi ${name || 'User'},
+
+您要求重設密碼，請點擊以下連結設定新密碼：
+
+${resetUrl}
+
+此連結將在 1 小時後過期。
+
+如果您沒有要求重設密碼，請忽略此郵件。
+    `.trim();
   }
 }

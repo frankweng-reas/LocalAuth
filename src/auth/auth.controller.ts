@@ -18,8 +18,11 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ValidateTokenDto } from './dto/validate-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { ChangePasswordExpiredDto } from './dto/change-password-expired.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { UsersService } from '../users/users.service';
 
@@ -86,6 +89,14 @@ export class AuthController {
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
     return this.authService.changePassword(req.user.userId, changePasswordDto);
+  }
+
+  /** 密碼過期時強制更換（不需 JWT，供登入被拒時使用） */
+  @Post('change-password-expired')
+  async changePasswordExpired(
+    @Body() dto: ChangePasswordExpiredDto,
+  ) {
+    return this.authService.changePasswordExpired(dto);
   }
 
   @Post('logout')
@@ -186,5 +197,107 @@ export class AuthController {
   @Post('resend-verification')
   async resendVerification(@Body() resendVerificationDto: ResendVerificationDto) {
     return this.authService.resendVerification(resendVerificationDto);
+  }
+
+  /** 忘記密碼：輸入 email 後寄出重設連結 */
+  @Post('forgot-password')
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  /** 重設密碼：以 token 設定新密碼 */
+  @Post('reset-password')
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
+  }
+
+  /** GET 重設密碼頁面（含 token 的連結點擊後顯示表單） */
+  @Get('reset-password')
+  async resetPasswordGet(
+    @Query('token') token: string,
+    @Res({ passthrough: false }) res: Response,
+  ) {
+    if (!token) {
+      res.status(400).type('text/html').send(this.getResetPasswordHtml('缺少 token', null));
+      return;
+    }
+    res.status(200).type('text/html').send(this.getResetPasswordHtml(null, token));
+  }
+
+  private getResetPasswordHtml(error: string | null, token: string | null): string {
+    // 表單 POST 使用相對路徑，與當前頁面同源
+    const apiPath = '/auth/reset-password';
+    const title = error ? '重設密碼失敗' : '重設密碼';
+    const formHtml = token
+      ? `
+        <form id="resetForm" style="margin-top: 20px;">
+          <input type="hidden" name="token" value="${token}">
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; margin-bottom: 4px; font-weight: 500;">新密碼</label>
+            <input type="password" name="new_password" required minlength="8" 
+              placeholder="至少 8 碼，含大寫/小寫/數字/符號其中 3 種"
+              style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; margin-bottom: 4px; font-weight: 500;">確認密碼</label>
+            <input type="password" name="confirm_password" required
+              style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+          </div>
+          <button type="submit" style="width: 100%; padding: 12px; background: #4F46E5; color: white; border: none; border-radius: 6px; cursor: pointer;">重設密碼</button>
+        </form>
+        <div id="result" style="margin-top: 16px; display: none;"></div>
+        <script>
+          document.getElementById('resetForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.target);
+            const np = fd.get('new_password');
+            const cp = fd.get('confirm_password');
+            if (np !== cp) { alert('兩次輸入的密碼不一致'); return; }
+            const result = document.getElementById('result');
+            result.style.display = 'block';
+            try {
+              const r = await fetch('${apiPath}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: fd.get('token'), new_password: np })
+              });
+              const data = await r.json();
+              if (r.ok) {
+                result.innerHTML = '<p style="color: #10b981;">✅ ' + (data.message || '密碼已重設') + '</p><p><a href="/auth-test.html">前往登入</a></p>';
+                e.target.remove();
+              } else {
+                result.innerHTML = '<p style="color: #ef4444;">❌ ' + (data.message || data.error || '重設失敗') + '</p>';
+              }
+            } catch (err) {
+              result.innerHTML = '<p style="color: #ef4444;">❌ 請求失敗</p>';
+            }
+          };
+        </script>
+      `
+      : '';
+
+    return `<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title} - LocalAuth</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; }
+    .card { background: white; border-radius: 12px; padding: 48px; max-width: 420px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.15); }
+    h1 { color: #333; font-size: 24px; margin-bottom: 16px; }
+    p { color: #666; line-height: 1.6; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>${title}</h1>
+    ${error ? `<p class="error">${error}</p>` : '<p>請設定您的新密碼：</p>'}
+    ${formHtml}
+  </div>
+</body>
+</html>`;
   }
 }
