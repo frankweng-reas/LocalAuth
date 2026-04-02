@@ -42,6 +42,46 @@
             font-size: 14px;
         }
 
+        .api-key-bar {
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .api-key-bar label {
+            font-weight: 600;
+            color: #92400e;
+            white-space: nowrap;
+            font-size: 14px;
+        }
+
+        .api-key-bar input {
+            flex: 1;
+            min-width: 200px;
+            padding: 8px 12px;
+            border: 1px solid #fcd34d;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            background: white;
+        }
+
+        .api-key-bar input:focus {
+            outline: none;
+            border-color: #f59e0b;
+        }
+
+        .api-key-status {
+            font-size: 13px;
+            color: #92400e;
+        }
+
         .content {
             display: grid;
             grid-template-columns: 1fr 2fr;
@@ -75,7 +115,9 @@
             margin-bottom: 5px;
         }
 
-        .form-group input {
+        .form-group input[type="email"],
+        .form-group input[type="password"],
+        .form-group input[type="text"] {
             width: 100%;
             padding: 10px 12px;
             border: 2px solid #e0e0e0;
@@ -87,6 +129,25 @@
         .form-group input:focus {
             outline: none;
             border-color: #667eea;
+        }
+
+        .form-group-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .form-group-checkbox input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .form-group-checkbox label {
+            color: #555;
+            font-size: 14px;
+            cursor: pointer;
         }
 
         .btn {
@@ -177,6 +238,7 @@
             border-radius: 4px;
             font-size: 12px;
             font-weight: 500;
+            margin-right: 4px;
         }
 
         .badge-success {
@@ -187,6 +249,11 @@
         .badge-inactive {
             background: #fee2e2;
             color: #991b1b;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
         }
 
         .alert {
@@ -257,7 +324,13 @@
     <div class="container">
         <div class="header">
             <h1>🔐 用戶管理系統</h1>
-            <p>簡單的用戶管理介面 - 查看、新增和管理用戶 | <a href="/admin/auth-test.html" style="color:#667eea">Auth 功能測試</a></p>
+            <p>Admin API 用戶管理介面 | <a href="/admin/auth-test.html" style="color:#667eea">Auth 功能測試</a></p>
+        </div>
+
+        <div class="api-key-bar">
+            <label>🔑 Admin API Key：</label>
+            <input type="password" id="adminApiKey" placeholder="輸入 ADMIN_API_KEY（與伺服器 .env 設定相同）" autocomplete="off">
+            <span class="api-key-status" id="apiKeyStatus">請先輸入 API Key 才能操作</span>
         </div>
 
         <div class="content">
@@ -271,11 +344,15 @@
                     </div>
                     <div class="form-group">
                         <label>密碼 *</label>
-                        <input type="password" id="createPassword" required placeholder="至少 6 個字元">
+                        <input type="password" id="createPassword" required placeholder="至少 8 碼，含大小寫/數字/符號其中 3 種">
                     </div>
                     <div class="form-group">
                         <label>名稱</label>
                         <input type="text" id="createName" placeholder="選填">
+                    </div>
+                    <div class="form-group-checkbox">
+                        <input type="checkbox" id="mustChangePassword">
+                        <label for="mustChangePassword">首次登入強制更換密碼</label>
                     </div>
                     <button type="submit" class="btn">建立用戶</button>
                 </form>
@@ -285,16 +362,17 @@
                 <h2>👥 用戶列表</h2>
                 <div class="stats">
                     <div class="stat-card">
-                        <div class="stat-number" id="totalUsers">0</div>
+                        <div class="stat-number" id="totalUsers">-</div>
                         <div class="stat-label">總用戶數</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number" id="activeUsers">0</div>
+                        <div class="stat-number" id="activeUsers">-</div>
                         <div class="stat-label">活躍用戶</div>
                     </div>
                 </div>
+                <button class="btn" style="margin-bottom:16px" onclick="loadUsers()">重新載入</button>
                 <div id="usersContainer" class="users-list">
-                    <div class="loading">載入中...</div>
+                    <div class="empty">請輸入 API Key 後點擊「重新載入」</div>
                 </div>
             </div>
         </div>
@@ -309,17 +387,52 @@
             return window.location.origin;
         })();
 
+        // 支援 ?apikey=xxx 預填 API Key（方便書籤或自動化）
+        (() => {
+            const params = new URLSearchParams(window.location.search);
+            const keyParam = params.get('apikey');
+            if (keyParam) {
+                document.getElementById('adminApiKey').value = keyParam;
+                document.getElementById('apiKeyStatus').textContent = '已從 URL 載入 API Key';
+            }
+        })();
+
+        function getApiKey() {
+            return document.getElementById('adminApiKey').value.trim();
+        }
+
+        function adminHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'x-admin-api-key': getApiKey(),
+            };
+        }
+
         // 載入用戶列表
         async function loadUsers() {
+            const key = getApiKey();
+            if (!key) {
+                document.getElementById('apiKeyStatus').textContent = '⚠️ 請先輸入 API Key';
+                return;
+            }
+            document.getElementById('usersContainer').innerHTML = '<div class="loading">載入中...</div>';
             try {
-                const response = await fetch(`${API_BASE}/users`);
+                const response = await fetch(`${API_BASE}/admin/users`, {
+                    headers: adminHeaders(),
+                });
+                if (response.status === 401) {
+                    document.getElementById('usersContainer').innerHTML =
+                        '<div class="empty">❌ API Key 錯誤或未設定</div>';
+                    document.getElementById('apiKeyStatus').textContent = '❌ API Key 驗證失敗';
+                    return;
+                }
                 const users = await response.json();
-                
+                document.getElementById('apiKeyStatus').textContent = '✅ API Key 驗證成功';
                 displayUsers(users);
                 updateStats(users);
             } catch (error) {
-                document.getElementById('usersContainer').innerHTML = 
-                    '<div class="empty">❌ 無法載入用戶列表</div>';
+                document.getElementById('usersContainer').innerHTML =
+                    '<div class="empty">❌ 無法連線到 LocalAuth 服務</div>';
                 console.error('Error loading users:', error);
             }
         }
@@ -327,7 +440,7 @@
         // 顯示用戶列表
         function displayUsers(users) {
             const container = document.getElementById('usersContainer');
-            
+
             if (users.length === 0) {
                 container.innerHTML = '<div class="empty">📭 目前沒有任何用戶</div>';
                 return;
@@ -338,9 +451,12 @@
                     <div class="user-card-header">
                         <div>
                             <div class="user-name">${user.name || '未設定名稱'}</div>
-                            ${user.isActive 
-                                ? '<span class="badge badge-success">啟用</span>' 
+                            ${user.isActive
+                                ? '<span class="badge badge-success">啟用</span>'
                                 : '<span class="badge badge-inactive">停用</span>'}
+                            ${user.emailVerified
+                                ? '<span class="badge badge-success">已驗證</span>'
+                                : '<span class="badge badge-warning">未驗證</span>'}
                         </div>
                         <button class="btn btn-danger" onclick="deleteUser('${user.id}', '${user.email}')">刪除</button>
                     </div>
@@ -354,7 +470,7 @@
         // 更新統計資料
         function updateStats(users) {
             document.getElementById('totalUsers').textContent = users.length;
-            document.getElementById('activeUsers').textContent = 
+            document.getElementById('activeUsers').textContent =
                 users.filter(u => u.isActive).length;
         }
 
@@ -374,26 +490,38 @@
         // 建立用戶
         document.getElementById('createUserForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
+            const key = getApiKey();
+            if (!key) {
+                showAlert('createAlert', '❌ 請先輸入 Admin API Key', true);
+                return;
+            }
+
             const email = document.getElementById('createEmail').value;
             const password = document.getElementById('createPassword').value;
             const name = document.getElementById('createName').value;
+            const mustChangePassword = document.getElementById('mustChangePassword').checked;
 
             try {
-                const response = await fetch(`${API_BASE}/auth/register`, {
+                const response = await fetch(`${API_BASE}/admin/users`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ email, password, name: name || undefined }),
+                    headers: adminHeaders(),
+                    body: JSON.stringify({
+                        email,
+                        password,
+                        name: name || undefined,
+                        mustChangePassword,
+                    }),
                 });
 
                 if (!response.ok) {
                     const error = await response.json();
-                    throw new Error(error.message || '建立失敗');
+                    const msg = Array.isArray(error.message) ? error.message.join('、') : (error.message || '建立失敗');
+                    throw new Error(msg);
                 }
 
-                showAlert('createAlert', `✅ 成功建立用戶: ${email}`);
+                const hint = mustChangePassword ? '（首次登入需更換密碼）' : '';
+                showAlert('createAlert', `✅ 成功建立用戶：${email}${hint}`);
                 document.getElementById('createUserForm').reset();
                 loadUsers();
             } catch (error) {
@@ -403,31 +531,25 @@
 
         // 刪除用戶
         async function deleteUser(id, email) {
-            if (!confirm(`確定要刪除用戶 "${email}" 嗎？\n\n此操作無法復原。`)) {
+            if (!confirm(`確定要刪除用戶「${email}」嗎？\n\n此操作無法復原。`)) {
                 return;
             }
-
             try {
-                const response = await fetch(`${API_BASE}/users/${id}`, {
+                const response = await fetch(`${API_BASE}/admin/users/${id}`, {
                     method: 'DELETE',
+                    headers: adminHeaders(),
                 });
 
-                if (!response.ok) {
+                if (!response.ok && response.status !== 204) {
                     throw new Error('刪除失敗');
                 }
 
-                alert(`✅ 已成功刪除用戶: ${email}`);
+                showAlert('createAlert', `✅ 已刪除用戶：${email}`);
                 loadUsers();
             } catch (error) {
                 alert(`❌ 刪除失敗: ${error.message}`);
             }
         }
-
-        // 初始載入
-        loadUsers();
-
-        // 每 30 秒自動重新載入
-        setInterval(loadUsers, 30000);
     </script>
 </body>
 </html>

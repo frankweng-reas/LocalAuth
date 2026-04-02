@@ -1,3 +1,5 @@
+# 專案根目錄的 .env 會自動用於 ${VAR} 替換（勿把敏感資訊 commit）。
+# 變更 .env 後請 docker compose up -d（無需 rebuild）；變更程式碼需 --build。
 services:
   app:
     build: .
@@ -10,7 +12,15 @@ services:
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       BASE_URL: ${BASE_URL:-http://localhost:4000}
       PORT: 4000
+      # On-prem / 帳號政策（與專案 .env.example 對齊；可於專案根目錄 .env 設定後由 compose 代入）
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
+      REGISTRATION_DISABLED: ${REGISTRATION_DISABLED:-false}
+      FORGOT_PASSWORD_ENABLED: ${FORGOT_PASSWORD_ENABLED:-true}
+      # 未設定時 /admin/* 會回應「Admin API is not configured」；正式環境請務必設定
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      AD_ENABLED: ${AD_ENABLED:-false}
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}

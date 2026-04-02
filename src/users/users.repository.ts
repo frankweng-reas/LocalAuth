@@ -73,6 +73,13 @@ export class UsersRepository {
     });
   }
 
+  async setPasswordChangedAt(id: string, date: Date | null): Promise<User> {
+    return this.prisma.user.update({
+      where: { id },
+      data: { passwordChangedAt: date },
+    });
+  }
+
   async updateProfile(id: string, data: { name?: string }): Promise<User> {
     return this.prisma.user.update({
       where: { id },

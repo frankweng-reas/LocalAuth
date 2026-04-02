@@ -5,6 +5,7 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  ServiceUnavailableException,
   Inject,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -45,6 +46,10 @@ export class AuthService {
       throw new ForbiddenException('Registration is disabled when AD is enabled');
     }
 
+    if (this.configService.get<string>('REGISTRATION_DISABLED') === 'true') {
+      throw new ForbiddenException('Self-registration is disabled. Please contact your administrator.');
+    }
+
     const { email, password, name } = registerDto;
 
     // Check if user or pending registration already exists
@@ -52,13 +57,23 @@ export class AuthService {
     if (existingUser) {
       throw new ConflictException('Email already registered');
     }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // On-prem mode: skip email verification, create user directly
+    const requireEmailVerification = this.configService.get<string>('REQUIRE_EMAIL_VERIFICATION') !== 'false';
+    if (!requireEmailVerification) {
+      await this.usersService.create(email, passwordHash, name, true);
+      return {
+        message: 'Registration successful. You can now log in.',
+      };
+    }
+
     const existingPending = await this.pendingRegistrationRepository.findByEmail(email);
     if (existingPending) {
       throw new ConflictException('Email already registered');
     }
-
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
 
     // Generate verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -339,6 +354,10 @@ export class AuthService {
   async forgotPassword(dto: ForgotPasswordDto) {
     if (this.configService.get<string>('AD_ENABLED') === 'true') {
       throw new ForbiddenException('Password reset is disabled when AD is enabled');
+    }
+
+    if (this.configService.get<string>('FORGOT_PASSWORD_ENABLED') === 'false') {
+      throw new ServiceUnavailableException('密碼重設功能已停用，請聯絡系統管理員');
     }
 
     const user = await this.usersRepository.findByEmail(dto.email);

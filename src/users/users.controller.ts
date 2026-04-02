@@ -1,14 +1,12 @@
 import {
   Controller,
-  Get,
   Delete,
   Patch,
-  Param,
-  Body,
   UseGuards,
   HttpCode,
   HttpStatus,
   Request,
+  Body,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -18,8 +16,6 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  // IMPORTANT: More specific routes (like /me) must come BEFORE parameterized routes (like /:id)
-  
   @Patch('me')
   @UseGuards(JwtAuthGuard)
   async updateProfile(
@@ -34,21 +30,5 @@ export class UsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteAccount(@Request() req) {
     await this.usersService.deleteAccount(req.user.userId);
-  }
-
-  @Get()
-  async findAll() {
-    return this.usersService.findAll();
-  }
-
-  @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.usersService.findById(id);
-  }
-
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string) {
-    await this.usersService.remove(id);
   }
 }
