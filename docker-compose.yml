@@ -1,12 +1,14 @@
 # 專案根目錄的 .env 會自動用於 ${VAR} 替換（勿把敏感資訊 commit）。
 # 變更 .env 後請 docker compose up -d（無需 rebuild）；變更程式碼需 --build。
+# 根目錄 .env 可設定 POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB（勿 commit 真密碼）。
+# 密碼若含 @ : / 等字元，請先 URL 編碼再放入 DATABASE_URL；建議用英數或 openssl rand -hex 24。
 services:
   app:
     build: .
     ports:
       - "4000:4000"
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/localauth
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-localauth}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-1h}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
@@ -41,9 +43,9 @@ services:
     ports:
       - "5433:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: localauth
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-localauth}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
