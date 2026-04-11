@@ -84,7 +84,9 @@ sudo certbot --nginx -d auth.yourdomain.com
 
 ---
 
-## 方式二：Docker Compose
+## 方式二：Docker Compose（On-prem 推薦）
+
+資料庫使用 **Bind Mount**（`./postgres_data`），方便備份、還原與售後支持。
 
 建立 `docker-compose.yml`：
 
@@ -112,15 +114,12 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: localauth
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-volumes:
-  pgdata:
 ```
 
 建立 `Dockerfile`：
@@ -148,6 +147,21 @@ CMD ["node", "dist/main.js"]
 docker compose up -d
 docker compose exec app npx prisma migrate deploy
 ```
+
+### postgres_data 目錄說明
+
+`./postgres_data` 由容器內的 postgres 使用者（UID 999）管理，初始化後權限為 `drwx------`，這是 PostgreSQL 的安全設計，屬於正常現象。
+
+若需要在主機端瀏覽該目錄（例如確認資料存在、手動備份），執行：
+
+```bash
+sudo chmod o+rx ./postgres_data
+```
+
+> **備份建議**：直接備份 `./postgres_data` 目錄，或使用 `pg_dump`：
+> ```bash
+> docker compose exec db pg_dump -U postgres localauth > backup.sql
+> ```
 
 ### 模擬外部系統測試（Docker）
 

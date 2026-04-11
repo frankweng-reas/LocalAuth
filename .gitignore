@@ -7,6 +7,12 @@ build/
 
 # Environment variables
 .env
+.env.onprem
+.env.saas
+
+# Data & Release
+postgres_data/
+release/
 
 # Logs
 *.log

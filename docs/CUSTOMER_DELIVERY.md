@@ -1,146 +1,173 @@
-# LocalAuth 對外客戶交付指南（草案）
+# LocalAuth 交付說明
 
-本文件供內部與客戶在**交付方式、環境需求、營運責任**上對齊使用。內容會隨產品版本與商務條款調整；實際以合約／發行說明為準。
-
----
-
-## 1. 目的與適用對象
-
-- **目的**：說明以 **預先建好的容器映像** 為主軸時，客戶端需具備什麼、要如何啟動與維運。
-- **適用對象**：在自有環境（地端 VM、私有雲、VPC）執行 LocalAuth 的客戶 IT／平台團隊。
-- **不在本文件範圍**：由我們代管的 SaaS 細節、各客戶專屬的客製化開發規格（可另附）。
+LocalAuth 是認證服務，作為 NeuroSme 的底層元件運行。不單獨銷售，隨 NeuroSme 一起交付。
 
 ---
 
-## 2. 建議交付策略（相對於「客戶自行 clone 建置」）
+## 1. 我們要做什麼
 
-**預建映像加上設定檔**：由我們 build 映像並以版本 tag 發布；客戶以 `docker compose` 或同等方式啟動，僅需設定環境變數與持久化。此方式適合作為**對外客戶預設**，可減少建置失敗與環境差異。
+### Build Image
+```bash
+# 在 LocalAuth repo 根目錄
+docker build -t localauth:1.x.x .
+docker save localauth:1.x.x -o localauth-1.x.x.tar
+```
 
-**客戶自行 build**：客戶取得原始碼後在本機或 CI 建置映像。適用於開放原始碼合約，或客戶強烈要求可稽核 build 流程時。
+### 交付物
+提供給客戶以下兩個檔案：
+- `localauth-1.x.x.tar`
+- `docker-compose.onprem.yml`
 
-結論：**對外客戶以「預建映像」為主**較利於支援與版本一致性；原始碼與 build 可作為附加選項另議。
+### 整合進 NeuroSme backend
+NeuroSme backend 的 `.env` 需要設定兩個值（與 `docker-compose.onprem.yml` 固定值對齊）：
 
----
-
-## 3. 系統架構概要（預設參考堆疊）
-
-預設建議與目前專案一致：
-
-- **應用容器**：LocalAuth（Node 應用，對外 **4000**）。
-- **資料庫容器**：PostgreSQL 16（資料存於 **具名 volume**，需備份策略）。
-
-應用映像啟動時會執行 `npx prisma migrate deploy` 後再啟動服務（見專案 `Dockerfile` 的 `CMD`），故**首次部署與升級映像後**，會自動套用我們隨版本釋出的資料庫 migration（客戶仍應在升級前自行備份資料庫）。
-
----
-
-## 4. 交付物清單（待商談細項以占位符標記）
-
-對外交付時，建議至少包含：
-
-1. **容器映像**
-   - 映像名稱與 **語意化版本 tag**（例：`registry.example.com/localauth:1.2.3`）。
-   - **digest**（可選，用於不可變版本鎖定）。
-2. **執行描述檔**
-   - `docker-compose` 範例（建議使用 `image:` 指向上述映像，而非要求客戶 `build:`）。
-   - 埠號、volume、相依服務（PostgreSQL）與健康檢查約定。
-3. **環境變數說明**
-   - 以專案根目錄 **`.env.example`** 為準，標註**必填／建議／選填**，以及正式環境安全注意事項（見第 6 節）。
-4. **發行說明（Release notes）**
-   - 該版本的變更摘要、是否需客戶手動操作、已知議題。
-5. **（可選）離線套組**
-   - `docker save` 產出之 `.tar`、checksum、載入與啟動步驟（內網／無 registry 環境）。
-
-以下需與法務／商務約定後填入，本文件先保留占位：
-
-- **映像庫位址**：`[TBD: REGISTRY_URL]`
-- **支援週期與回報管道**：`[TBD: SUPPORT_POLICY]`
-- **CVE／安全更新通知方式**：`[TBD: SECURITY_UPDATES]`
+```bash
+JWT_SECRET=db0b7dde5c731381ba4aac77eb2640a9f74bf2efb20cdf9b3e51e9280b3faeb8
+LOCALAUTH_ADMIN_API_KEY=d21c4782231ea69c3223597d6d7df6d8210b0cae7c3c4e36ce11327d9aac7752
+LOCALAUTH_ADMIN_URL=http://localhost:4000
+```
 
 ---
 
-## 5. 客戶環境前置需求
+## 2. 客戶要做什麼
 
-- 可執行 **Docker Engine** 與 **Docker Compose**（版本下限可依支援矩陣另訂 `[TBD]`）。
-- 可連線至所選的 **容器映像庫**（或由客戶先 `docker load` 離線映像）。
-- 可配置 **反向代理／TLS**（若對外提供 HTTPS，建議由客戶 Nginx、Load Balancer 或同等元件處理）。
-- **持久化**：PostgreSQL volume 所在磁碟需足夠容量與備份機制。
+### 安裝（一次性）
 
----
+**Step 1：載入 image**
+```bash
+docker load -i localauth-1.x.x.tar
+```
 
-## 6. 設定與安全重點（正式環境必讀）
+**Step 2：啟動**
+```bash
+docker compose -f docker-compose.onprem.yml up -d
+```
 
-客戶應依 `.env.example` 建立 `.env`（或由部署平台注入同等環境變數），並特別注意：
+**Step 3：首次登入**
 
-- **`POSTGRES_PASSWORD`**：須改為強密碼；若出現在 `DATABASE_URL`，密碼含 `@`、`:`、`/` 等字元需 **URL 編碼**（專案 `docker-compose.yml` 註解已有提醒）。
-- **`JWT_SECRET`**：必須替換預設值；建議高熵隨機字串。
-- **`BASE_URL`**：應與使用者瀏覽器實際造訪的應用網址一致，否則驗證信、重設密碼連結可能錯誤。
-- **`ADMIN_API_KEY`**：正式環境應設定，以保護 `/admin/*`；金鑰需用安全管道保存與輪替。
-- **`REQUIRE_EMAIL_VERIFICATION` 與 `EMAIL_PROVIDER`**：若無 SMTP 或第三方寄信，需與客戶協調是否關閉驗證，或提供 `smtp`、`resend` 等設定（見 `.env.example`）。
+查看啟動 log 取得預設帳號：
+```bash
+docker compose -f docker-compose.onprem.yml logs localauth | grep -A5 "Default admin"
+```
 
-資料庫埠對外：目前開發用 `docker-compose.yml` 將 DB 對應至主機 **5433**；**正式環境建議不對外公開**，僅應用容器網路可存取資料庫。
+預設帳號：
+- Email：`admin@local.dev`
+- 密碼：`Admin1234!`
 
----
-
-## 7. 映像取得與啟動（流程摘要）
-
-### 7.1 自映像庫拉取（連網環境）
-
-1. 登入我們提供的 registry（若為私有）：`[TBD: 指令範例]`
-2. 使用交付的 compose 檔（內含 `image: ...:版本`）與客戶填寫的 `.env`：
-   - `docker compose pull`
-   - `docker compose up -d`
-
-### 7.2 離線載入（內網環境）
-
-1. 將交付的 `localauth-版本.tar` 載入：`docker load -i ...`
-2. 確認本機 tag 與 compose 中 `image:` 一致（或可重新 tag）。
-3. `docker compose up -d`
-
-具體檔名、checksum、載入後驗證方式：`[TBD]`
+登入後立即修改密碼。
 
 ---
 
-## 8. 升級與回滾（討論用架構）
+### 日常維運
 
-- **升級**：備份 DB → 拉取新映像 tag（或載入新 tar）→ `docker compose up -d`；映像啟動時會跑 `prisma migrate deploy`。
-- **回滾**：還原資料庫備份至升級前狀態，並啟動**前一版**映像 tag（migration 是否可逆視版本而定，需在 Release notes 標示）。
-- 詳細 SOP 與我們是否提供遷移腳本檢查：`[TBD]`
+**備份（唯一的日常責任）**
 
----
+建議每天排程執行，備份檔保留至少 7 天：
 
-## 9. 備份與還原（客戶責任）
+```bash
+# 方式 A：目錄備份（服務運行中也可執行）
+cp -r ./localauth_data ./localauth_data_backup_$(date +%Y%m%d)
 
-- **必備**：PostgreSQL 定期備份（ volume 快照或 `pg_dump` 等）。
-- **還原**：在維護窗口還原備份後，再啟動對應版本映像。
-- RPO／RTO 目標由客戶內部規範決定，我們可提供建議 check list： `[TBD]`
-
----
-
-## 10. 與「目前開發 repo」的對應關係
-
-- **`Dockerfile`**：我們於 build pipeline 使用；客戶**不一定**需要。
-- **`docker-compose.yml`**：可作為範本；對外版建議改為 **`image:`** 並移除或註解 `build: .`，且視正式環境調整資料庫是否對外開埠。
-- **`.env.example`**：作為客戶設定欄位清單與說明依據。
-
-建議另維護一份 **`docker-compose.customer.example.yml`**（或同等名稱）置於 release 套件中，避免與內部開發用 compose 混淆。是否納入 repo：`[TBD]`
+# 方式 B：pg_dump（較小，推薦）
+docker compose -f docker-compose.onprem.yml exec localauth-db \
+  pg_dump -U localauth localauth > backup_$(date +%Y%m%d).sql
+```
 
 ---
 
-## 11. 待與客戶／內部續議事項（清單）
+### 還原
 
-下列適合在簽約或技術工作坊逐項敲定：
+**情況 A：從目錄備份還原**
+```bash
+# 1. 停止服務
+docker compose -f docker-compose.onprem.yml down
 
-1. 映像發布位置（公開／私有 registry）與認證方式。  
-2. 是否提供 **SBOM** 或基線掃描報告（資安稽核）。  
-3. 客戶是否允許對外連線至 Resend／SMTP／其他雲端服務。  
-4. **AD／LDAP** 整合需求與時程（目前為選配能力，見 `.env.example`）。  
-5.  SLA、問題分級、聯絡窗口。  
-6. 法遵：日誌留存、個資地區、資料可否出境。  
+# 2. 清除損壞資料，還原備份
+rm -rf ./localauth_data
+cp -r ./localauth_data_backup_20260411 ./localauth_data
+
+# 3. 重新啟動
+docker compose -f docker-compose.onprem.yml up -d
+```
+
+**情況 B：從 pg_dump 備份還原**
+```bash
+# 1. 停止 app（保留 DB 容器運行）
+docker compose -f docker-compose.onprem.yml stop localauth
+
+# 2. 清空資料庫
+docker compose -f docker-compose.onprem.yml exec localauth-db \
+  psql -U localauth -c "DROP DATABASE localauth; CREATE DATABASE localauth;"
+
+# 3. 還原備份
+docker compose -f docker-compose.onprem.yml exec -T localauth-db \
+  psql -U localauth localauth < backup_20260411.sql
+
+# 4. 重新啟動
+docker compose -f docker-compose.onprem.yml up -d
+```
+
+**情況 C：沒有備份，DB 損壞**
+```bash
+# 1. 停止服務
+docker compose -f docker-compose.onprem.yml down
+
+# 2. 清除損壞資料
+rm -rf ./localauth_data
+
+# 3. 重新啟動（LocalAuth 會自動重建空的 DB）
+docker compose -f docker-compose.onprem.yml up -d
+
+# 結果：所有使用者帳號消失，需要重新建立
+# 預設 admin 帳號會自動重新建立（admin@local.dev / Admin1234!）
+```
 
 ---
 
-## 12. 文件修訂
+### DB 除錯（需要直接查看資料庫時）
 
-- **1.0.0**（2026-04-10）：與程式版本 `1.0.0`、Git 標籤 `v1.0.0` 對齊；納入對外交付指南，採預建映像交付主軸，並與現有 Docker／Compose 行為對齊。
+DB port 不對外，透過 `docker exec` 進入容器操作：
 
-維護者：於對外流程確定後，將 `[TBD]` 逐項替換，並與實際 `docker compose` 範例一併存於對外 release 套件。
+```bash
+# 進入 DB 容器
+docker exec -it localauth-db-1 psql -U localauth localauth
+
+# 常用指令
+\dt          -- 列出所有資料表
+\q           -- 離開
+SELECT count(*) FROM "User";   -- 查看使用者數量
+```
+
+---
+
+### 升級
+```bash
+# 1. 先備份
+cp -r ./localauth_data ./localauth_data_backup_$(date +%Y%m%d)
+
+# 2. 載入新版 image
+docker load -i localauth-新版本.tar
+
+# 3. 重啟
+docker compose -f docker-compose.onprem.yml up -d
+```
+
+---
+
+## 3. 客戶不需要做的事
+
+- 修改任何設定檔
+- 設定任何環境變數
+- 接觸 `.env` 檔案
+- 知道 JWT_SECRET 或 ADMIN_API_KEY 的值
+- 直連資料庫（DB port 不對外）
+
+---
+
+## 4. 固定值對照表（工程師備查）
+
+| 變數 | 值 | 用於 |
+|------|-----|------|
+| `POSTGRES_PASSWORD` | `ccb7e578...` | LocalAuth DB，固定，不需跨系統同步 |
+| `JWT_SECRET` | `db0b7dde...` | LocalAuth + NeuroSme backend 共用 |
+| `ADMIN_API_KEY` | `d21c4782...` | LocalAuth + NeuroSme backend 共用 |

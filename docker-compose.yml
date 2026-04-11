@@ -14,12 +14,17 @@ services:
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       BASE_URL: ${BASE_URL:-http://localhost:4000}
       PORT: 4000
-      # On-prem / 帳號政策（與專案 .env.example 對齊；可於專案根目錄 .env 設定後由 compose 代入）
+      # On-prem / 帳號政策
+      # DEPLOY_MODE：onprem | saas | dev（onprem 自動套用對應政策）
+      DEPLOY_MODE: ${DEPLOY_MODE:-dev}
       REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
       REGISTRATION_DISABLED: ${REGISTRATION_DISABLED:-false}
       FORGOT_PASSWORD_ENABLED: ${FORGOT_PASSWORD_ENABLED:-true}
       # 未設定時 /admin/* 會回應「Admin API is not configured」；正式環境請務必設定
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      # 預設管理員帳號（首次啟動且 DB 無 user 時自動建立）
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-admin@local.dev}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-Admin1234!}
       AD_ENABLED: ${AD_ENABLED:-false}
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
@@ -47,12 +52,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-localauth}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-volumes:
-  pgdata:

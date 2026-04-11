@@ -5,3 +5,4 @@ dist
 *.md
 test
 *.log
+postgres_data

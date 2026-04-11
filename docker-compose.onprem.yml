@@ -1,0 +1,48 @@
+# LocalAuth On-Prem 部署 Compose
+#
+# 使用方式：
+#   docker compose -f docker-compose.onprem.yml up -d
+#
+# 升級方式：
+#   docker compose -f docker-compose.onprem.yml pull
+#   docker compose -f docker-compose.onprem.yml up -d
+#
+# 客戶 IT 唯一的責任：定期備份 ./localauth_data 目錄
+
+services:
+  localauth:
+    image: localauth:latest
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgresql://localauth:ccb7e57879127b441728934b2fa56dc3db1d40ceae05084c@localauth-db:5432/localauth
+      JWT_SECRET: db0b7dde5c731381ba4aac77eb2640a9f74bf2efb20cdf9b3e51e9280b3faeb8
+      JWT_ACCESS_EXPIRES_IN: 1h
+      JWT_REFRESH_EXPIRES_IN: 7d
+      BASE_URL: ""
+      PORT: 4000
+      DEPLOY_MODE: onprem
+      ADMIN_API_KEY: d21c4782231ea69c3223597d6d7df6d8210b0cae7c3c4e36ce11327d9aac7752
+      DEFAULT_ADMIN_EMAIL: admin@local.dev
+      DEFAULT_ADMIN_PASSWORD: Admin1234!
+      AD_ENABLED: false
+      EMAIL_PROVIDER: console
+    depends_on:
+      localauth-db:
+        condition: service_healthy
+
+  localauth-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: localauth
+      POSTGRES_PASSWORD: ccb7e57879127b441728934b2fa56dc3db1d40ceae05084c
+      POSTGRES_DB: localauth
+    volumes:
+      - ./localauth_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U localauth"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
