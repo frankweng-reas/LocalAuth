@@ -5,6 +5,9 @@
 		},
 		{
 			"path": ".."
+		},
+		{
+			"path": "../../reas-portal"
 		}
 	],
 	"settings": {}
